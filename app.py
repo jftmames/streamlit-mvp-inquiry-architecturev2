@@ -8,6 +8,47 @@ from adaptive_dialogue import adaptive_dialogue_flow
 from reasoning_tracker import ReasoningTracker
 from erotetic_equilibrium_evaluator import evaluate_equilibrium
 
+
+# app.py  (extracto)
+import streamlit as st
+from modules.epistemic_profile_adapter import (
+    load_profile, adapt_prompt,
+    get_nav_weights, get_eee_target, get_critique_level
+)
+
+# 1. Selección de perfil desde la barra lateral
+st.sidebar.title("Perfil epistémico")
+profile_name = st.sidebar.selectbox(
+    "Selecciona contexto:",
+    ["educativo", "juridico", "clinico", "etico"]
+)
+profile = load_profile(profile_name)
+
+# 2. Guarda en session_state (útil para otros módulos)
+st.session_state["epistemic_profile"] = profile
+
+# 3. Entrada del usuario
+user_question = st.text_area("Plantea tu dilema o pregunta:")
+
+if st.button("Analizar"):
+    # 4. Adaptar prompt antes de enviarlo al motor / LLM
+    full_prompt = adapt_prompt(user_question, profile)
+
+    # 5. Pasar pesos y umbrales a módulos inferiores
+    nav_weights = get_nav_weights(profile)
+    eee_target = get_eee_target(profile)
+    critique_level = get_critique_level(profile)
+
+    # Ejemplo de llamada al motor (pseudo-código):
+    from core.engine import run_deliberation
+    result = run_deliberation(
+        prompt=full_prompt,
+        nav_priorities=nav_weights,
+        eee_target=eee_target,
+        critique_level=critique_level
+    )
+    st.write(result)
+
 # Configurar página
 st.set_page_config(page_title="Arquitectura Cognitiva - Complejos de Indagación", layout="wide")
 st.title("Arquitectura Cognitiva para Modelos de Lenguaje Generativo")

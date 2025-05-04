@@ -1,6 +1,24 @@
-# app.py
-
+# ──────────────────────────────────────────────────────────────
+# app.py – MVP Arquitectura Cognitiva (versión consolidada)
+# ──────────────────────────────────────────────────────────────
 import streamlit as st
+
+# Configuración de página (¡DEBE ser la 1.ª instrucción Streamlit!)
+st.set_page_config(
+    page_title="Arquitectura Cognitiva - Complejos de Indagación",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ╭─────────────────────────── Import propios ─────────────────────────╮
+from modules.epistemic_profile_adapter import (
+    load_profile,
+    adapt_prompt,
+    get_nav_weights,
+    get_eee_target,
+    get_critique_level,
+)
+
 from inquiry_engine import generate_subquestions
 from epistemic_navigator import display_navigation
 from contextual_generator import generate_contextual_response
@@ -8,108 +26,112 @@ from adaptive_dialogue import adaptive_dialogue_flow
 from reasoning_tracker import ReasoningTracker
 from erotetic_equilibrium_evaluator import evaluate_equilibrium
 
+# Si tu orquestador general está en core/engine.py:
+from core.engine import run_deliberation
+# ╰────────────────────────────────────────────────────────────────────╯
 
-# app.py  (extracto)
-import streamlit as st
-from modules.epistemic_profile_adapter import (
-    load_profile, adapt_prompt,
-    get_nav_weights, get_eee_target, get_critique_level
-)
 
-# 1. Selección de perfil desde la barra lateral
-st.sidebar.title("Perfil epistémico")
+# ╭──────────────────────── Sidebar: Perfil epistémico ───────────────╮
+st.sidebar.title("⚙️ Perfil epistémico")
 profile_name = st.sidebar.selectbox(
     "Selecciona contexto:",
-    ["educativo", "juridico", "clinico", "etico"]
+    ("educativo", "juridico", "clinico", "etico"),
 )
 profile = load_profile(profile_name)
-
-# 2. Guarda en session_state (útil para otros módulos)
 st.session_state["epistemic_profile"] = profile
+# ╰────────────────────────────────────────────────────────────────────╯
 
-# 3. Entrada del usuario
-user_question = st.text_area("Plantea tu dilema o pregunta:")
 
-if st.button("Analizar"):
-    # 4. Adaptar prompt antes de enviarlo al motor / LLM
+# ╭─────────────────────────── Título principal ──────────────────────╮
+st.title("Arquitectura Cognitiva para Modelos de Lenguaje Generativo")
+st.subheader(
+    "Explora y verifica trayectorias epistémicas mediante complejos de indagación jerárquicos"
+)
+# ╰────────────────────────────────────────────────────────────────────╯
+
+
+# ╭──────────────────────────────── Inicialización ────────────────────╮
+if "tracker" not in st.session_state:
+    st.session_state.tracker = ReasoningTracker()
+# ╰────────────────────────────────────────────────────────────────────╯
+
+
+# ╭───────────────────────── Entrada pregunta central ────────────────╮
+user_question = st.text_input("Introduce tu pregunta central:")
+
+if st.button("Analizar (modo completo)"):
+    # —— Adaptar prompt al perfil
     full_prompt = adapt_prompt(user_question, profile)
 
-    # 5. Pasar pesos y umbrales a módulos inferiores
+    # —— Parámetros epistémicos
     nav_weights = get_nav_weights(profile)
     eee_target = get_eee_target(profile)
     critique_level = get_critique_level(profile)
 
-    # Ejemplo de llamada al motor (pseudo-código):
-    from core.engine import run_deliberation
+    # —— Ejecución del motor deliberativo global
     result = run_deliberation(
         prompt=full_prompt,
         nav_priorities=nav_weights,
         eee_target=eee_target,
-        critique_level=critique_level
+        critique_level=critique_level,
     )
     st.write(result)
 
-# Configurar página
-st.set_page_config(page_title="Arquitectura Cognitiva - Complejos de Indagación", layout="wide")
-st.title("Arquitectura Cognitiva para Modelos de Lenguaje Generativo")
-st.subheader("Explora y verifica trayectorias epistémicas mediante complejos de indagación jerárquicos")
 
-# Inicializar tracker en session_state
-if "tracker" not in st.session_state:
-    st.session_state.tracker = ReasoningTracker()
-
-# Entrada de pregunta central
-user_question = st.text_input("Introduce tu pregunta central:")
-
+# ╭───────────────────── Flujo interactivo paso a paso ───────────────╮
 if user_question:
-    # Generar subpreguntas
-    subquestions = generate_subquestions(user_question)
-    
-    st.write("### Subpreguntas generadas:")
-    for idx, subq in enumerate(subquestions):
-        st.write(f"{idx+1}. {subq}")
 
-    # Visualizar navegación
+    # 1️⃣  Generar subpreguntas
+    subquestions = generate_subquestions(user_question)
+    st.write("### Subpreguntas generadas:")
+    for i, sq in enumerate(subquestions, start=1):
+        st.write(f"{i}. {sq}")
+
+    # 2️⃣  Mostrar mapa de navegación
     st.write("### Mapa de Indagación:")
     display_navigation(user_question, subquestions)
 
-    # Seleccionar subpregunta
-    selected_idx = st.selectbox("Selecciona una subpregunta para explorar:", range(len(subquestions)))
+    # 3️⃣  Selección de subpregunta
+    sel_idx = st.selectbox(
+        "Selecciona una subpregunta para explorar:",
+        range(len(subquestions)),
+        format_func=lambda x: f"{x+1}",
+    )
 
-    if st.button("Explorar Subpregunta"):
-        selected_question = subquestions[selected_idx]
+    if st.button("Explorar subpregunta"):
+        selected_question = subquestions[sel_idx]
         st.write("### Subpregunta seleccionada:")
         st.info(selected_question)
 
-        # Diálogo adaptativo
+        # 3.a  Diálogo adaptativo
         adaptive_dialogue_flow(selected_question)
 
-        # Generar respuesta contextual
+        # 3.b  Respuesta contextual
         st.write("### Respuesta reflexiva generada:")
-        contextual_response = generate_contextual_response(selected_question)
-        st.write(contextual_response)
+        contextual_resp = generate_contextual_response(selected_question)
+        st.write(contextual_resp)
 
-        # Evaluación de equilibrio erotético
-        eee_result = evaluate_equilibrium(selected_question, contextual_response)
-        if eee_result["estado"] != "error":
+        # 3.c  Evaluación de equilibrio
+        eee = evaluate_equilibrium(selected_question, contextual_resp)
+        if eee["estado"] != "error":
             st.subheader("⚖️ Evaluación de Equilibrio Erotético")
-            st.write(f"**Estado:** {eee_result['estado'].capitalize()}")
+            st.write(f"**Estado:** {eee['estado'].capitalize()}")
             st.write("**Contra-preguntas generadas:**")
-            for q in eee_result["contra_preguntas"]:
+            for q in eee["contra_preguntas"]:
                 st.markdown(f"- {q}")
             with st.expander("Ver comentario completo del verificador"):
-                st.markdown(eee_result["comentario"])
+                st.markdown(eee["comentario"])
 
-        # Registrar razonamiento
+        # 3.d  Registro en el tracker
         st.session_state.tracker.add_entry(
             user_question=user_question,
             subquestion=selected_question,
-            response=contextual_response,
-            refinements=eee_result["contra_preguntas"]
+            response=contextual_resp,
+            refinements=eee["contra_preguntas"],
         )
         st.success("Entrada registrada en el historial.")
 
-    # Mostrar historial y exportar
+    # 4️⃣  Historial y exportación
     st.markdown("---")
     st.subheader("Historial de Razonamiento")
 
@@ -123,3 +145,4 @@ if user_question:
     with col2:
         if st.button("Exportar como CSV"):
             st.session_state.tracker.export_to_csv()
+# ╰────────────────────────────────────────────────────────────────────╯
